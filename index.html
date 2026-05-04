@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Handwriting Stress Analysis</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --surface: rgba(30, 41, 59, 0.7);
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+        }
+
+        .container {
+            width: 90%;
+            max-width: 600px;
+            background: var(--surface);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(40px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .upload-area {
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 40px 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 25px;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.05);
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            display: inline-block;
+        }
+
+        .upload-text {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .upload-hint {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+            display: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -10px var(--secondary);
+        }
+
+        .file-info {
+            display: none;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Results Section */
+        .result-box {
+            margin-top: 30px;
+            padding: 25px;
+            border-radius: 16px;
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .result-box.normal {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success);
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.2);
+        }
+
+        .result-box.stressed {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+            box-shadow: 0 0 30px rgba(239, 68, 68, 0.2);
+        }
+
+        .result-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+        
+        .normal .result-title { color: #34d399; }
+        .stressed .result-title { color: #f87171; }
+
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .loader {
+            display: none;
+            margin: 20px auto;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>AI Stress Analysis</h1>
+        <p class="subtitle">Upload handwriting photo (.jpg, .png) to evaluate stress using 2D-CNN & Graphology Features.</p>
+
+        <form id="uploadForm">
+            <div class="upload-area" id="dropZone">
+                <span class="upload-icon">📸</span>
+                <div class="upload-text">Click or drag handwriting image here</div>
+                <div class="upload-hint">Supported format: .jpg, .png</div>
+                <input type="file" id="fileInput" accept="image/png, image/jpeg">
+            </div>
+
+            <div class="file-info" id="fileInfo" style="display: none;">
+                <span id="fileName">No file selected</span>
+                <span style="cursor: pointer; color: var(--danger);" onclick="resetForm()">✕</span>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">Analyze Handwriting</button>
+        </form>
+
+        <div class="loader" id="loader"></div>
+
+        <div class="result-box" id="resultBox">
+            <div class="result-title" id="resultTitle">Result</div>
+            <div id="resultProb" style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 10px;">Probability: 0%</div>
+            
+            <div style="margin: 15px 0;">
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px;">ผลการวิเคราะห์เชิงลึก (Grad-CAM Heatmap):</p>
+                <img id="heatmapImg" src="" alt="Grad-CAM Heatmap" style="max-width: 100%; border-radius: 8px; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                
+                <div id="heatmapLegend" style="margin-top: 12px; font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 8px; display: none;">
+                    <span>ปกติ (ผ่อนคลาย)</span>
+                    <div style="height: 8px; width: 120px; background: linear-gradient(90deg, #000080, #00ffff, #ffff00, #ff0000); border-radius: 4px;"></div>
+                    <span>ผิดปกติ (ตึงเครียด)</span>
+                </div>
+            </div>
+
+            <div id="analysisDetails" style="margin-top: 20px; text-align: left; background: rgba(0,0,0,0.25); padding: 20px; border-radius: 12px; font-size: 0.9rem; display: none; border: 1px solid rgba(255,255,255,0.05);">
+                <h4 style="margin-bottom: 12px; color: var(--primary); font-weight: 600; font-size: 1.05rem;">📊 รายละเอียดการวิเคราะห์</h4>
+                <ul id="analysisList" style="list-style-type: none; margin-left: 0; padding-left: 0; color: var(--text-muted); line-height: 1.8;">
+                    <!-- JS will populate this -->
+                </ul>
+                <div id="recommendationBox" style="margin-top: 15px; padding: 12px 15px; border-left: 4px solid var(--secondary); background: rgba(139, 92, 246, 0.1); border-radius: 0 8px 8px 0; color: #e2e8f0; line-height: 1.5;">
+                    <!-- JS will populate this -->
+                </div>
+            </div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const submitBtn = document.getElementById('submitBtn');
+        const uploadForm = document.getElementById('uploadForm');
+        const loader = document.getElementById('loader');
+        const resultBox = document.getElementById('resultBox');
+        const heatmapImg = document.getElementById('heatmapImg');
+        
+        // Drag & Drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                updateFileDisplay();
+            }
+        });
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', updateFileDisplay);
+
+        function updateFileDisplay() {
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const fileNameLower = file.name.toLowerCase();
+                if(fileNameLower.endsWith('.jpg') || fileNameLower.endsWith('.jpeg') || fileNameLower.endsWith('.png')) {
+                    dropZone.style.display = 'none';
+                    fileInfo.style.display = 'flex';
+                    fileName.textContent = file.name;
+                    submitBtn.style.display = 'block';
+                    resultBox.style.display = 'none';
+                } else {
+                    alert('Please upload a .jpg or .png image file');
+                    resetForm();
+                }
+            }
+        }
+
+        function resetForm() {
+            fileInput.value = '';
+            dropZone.style.display = 'block';
+            fileInfo.style.display = 'none';
+            submitBtn.style.display = 'none';
+            resultBox.style.display = 'none';
+        }
+
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!fileInput.files[0]) return;
+
+            submitBtn.style.display = 'none';
+            loader.style.display = 'block';
+            resultBox.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                loader.style.display = 'none';
+                
+                if (data.success) {
+                    showResult(data);
+                } else {
+                    alert(data.error || 'An error occurred');
+                    submitBtn.style.display = 'block';
+                }
+            } catch (err) {
+                loader.style.display = 'none';
+                submitBtn.style.display = 'block';
+                alert('Server error: ' + err.message);
+            }
+        });
+
+        function showResult(data) {
+            resultBox.style.display = 'block';
+            resultBox.className = 'result-box ' + (data.is_stressed ? 'stressed' : 'normal');
+            
+            document.getElementById('resultTitle').textContent = data.message;
+            
+            const probPercent = (data.probability * 100).toFixed(2);
+            document.getElementById('resultProb').textContent = `Stress Probability: ${probPercent}%`;
+            
+            const fill = document.getElementById('progressFill');
+            fill.style.width = '0%';
+            
+            setTimeout(() => {
+                fill.style.width = probPercent + '%';
+                fill.style.background = data.is_stressed ? 'linear-gradient(90deg, #ef4444, #f87171)' : 'linear-gradient(90deg, #10b981, #34d399)';
+            }, 50);
+
+            if (data.heatmap_url) {
+                heatmapImg.src = data.heatmap_url;
+                heatmapImg.style.display = 'block';
+                document.getElementById('heatmapLegend').style.display = 'flex';
+            } else {
+                heatmapImg.style.display = 'none';
+                document.getElementById('heatmapLegend').style.display = 'none';
+            }
+
+            // Populate Analysis Details
+            document.getElementById('analysisDetails').style.display = 'block';
+            const list = document.getElementById('analysisList');
+            const rec = document.getElementById('recommendationBox');
+            
+            if (data.is_stressed) {
+                list.innerHTML = `
+                    <li><span style="color: #f87171;">🔴</span> <strong>พื้นที่แสดงผล (Activation Areas):</strong> ระบบ AI ตรวจพบความผิดปกติของการตวัดเส้นและจุดที่มีแรงกดมากผิดปกติ (แสดงด้วยพื้นที่สีแดง/เหลืองบนภาพ)</li>
+                    <li><span style="color: #f87171;">🔴</span> <strong>ทฤษฎีการเขียน (Kinematic Graphology):</strong> ความหนาบางของเส้นที่ไม่สม่ำเสมอ บ่งบอกถึงภาวะเกร็งของกล้ามเนื้อมือขณะเขียน ซึ่งสัมพันธ์กับความเครียด</li>
+                    <li><span style="color: #f87171;">🔴</span> <strong>ความแม่นยำ (Confidence Score):</strong> ตรงกับรูปแบบลายมือของผู้ที่มีภาวะความเครียดสูงถึง ${(data.probability*100).toFixed(1)}%</li>
+                `;
+                rec.innerHTML = "<strong>💡 คำแนะนำ:</strong> ลายมือของคุณมีลักษณะที่บ่งบอกถึงภาวะตึงเครียดทางอารมณ์ แนะนำให้พักสายตา ยืดเส้นยืดสาย หรือฝึกหายใจลึกๆ สัก 5-10 นาทีนะครับ";
+            } else {
+                list.innerHTML = `
+                    <li><span style="color: #34d399;">🟢</span> <strong>พื้นที่แสดงผล (Activation Areas):</strong> โทนสีบนภาพมีความสม่ำเสมอ ตรวจพบจุดที่บ่งชี้ความตึงเครียดน้อยมาก</li>
+                    <li><span style="color: #34d399;">🟢</span> <strong>ทฤษฎีการเขียน (Kinematic Graphology):</strong> ความหนาบางของเส้นมีความลื่นไหลและสม่ำเสมอ บ่งบอกถึงการควบคุมกล้ามเนื้อมือที่ผ่อนคลายและมีสมาธิ</li>
+                    <li><span style="color: #34d399;">🟢</span> <strong>ความแม่นยำ (Confidence Score):</strong> ตรงกับรูปแบบลายมือของผู้ที่มีสภาวะอารมณ์ผ่อนคลายถึง ${((1-data.probability)*100).toFixed(1)}%</li>
+                `;
+                rec.innerHTML = "<strong>💡 คำแนะนำ:</strong> ลายมือของคุณมีความสม่ำเสมอและผ่อนคลายมากครับ รักษาสภาวะอารมณ์ที่สมดุลแบบนี้ต่อไปนะครับ!";
+            }
+
+            submitBtn.style.display = 'block';
+            submitBtn.textContent = 'วิเคราะห์รูปภาพอื่น (Analyze Another File)';
+        }
+    </script>
+</body>
+</html>

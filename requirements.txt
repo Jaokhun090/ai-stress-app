@@ -1,0 +1,6 @@
+Flask
+werkzeug
+tensorflow-cpu
+numpy
+opencv-python-headless
+gunicorn
